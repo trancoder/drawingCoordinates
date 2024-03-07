@@ -31,21 +31,30 @@ void plotData() {
 
     // Create Gtkmm window and widgets
     Gtk::Window window;
+    window.set_title("Plotter");
+    window.set_default_size(640, 480);
+    window.set_position(Gtk::WIN_POS_CENTER);
     Gtk::DrawingArea drawingArea;
-    window.add(drawingArea);      
+    window.add(drawingArea);    
 
     // Connect signal_draw() signal with a lambda function for drawing    
     drawingArea.signal_draw().connect([&drawingArea](const Cairo::RefPtr<Cairo::Context>& cr) {
-        
         // Print a statement before setting the color
         std::cout << "Processing the coordinates " << std::endl;
 
-        // Lock the mutex before accessing the shared data
-        std::unique_lock<std::mutex> lock(mtx);
+        {
+            // Lock the mutex before accessing the shared data
+            std::unique_lock<std::mutex> lock(mtx);
+
+            // Wait until new data is available
+            cv.wait(lock, []{ return !coordinateQueue.empty(); });
+            
+        }
         
         // Draw all coordinates in the queue
-        while (!coordinateQueue.empty()) {
+        while (!coordinateQueue.empty()) {            
             const Coordinate& coord = coordinateQueue.front();
+            std::cout << "Found coordinates (x,y) = " << coord.x << ", " << coord.y << std::endl;
             cr->set_source_rgb(0.0, 0.0, 0.0);
             cr->arc(coord.x, coord.y, 3.0, 0.0, 2.0 * M_PI);
             cr->fill();
@@ -55,6 +64,12 @@ void plotData() {
     });
     // Show the window
     window.show_all();
+
+    // Force the drawing area to redraw every 100 milliseconds
+    Glib::signal_timeout().connect([&drawingArea]() {
+        drawingArea.queue_draw();
+        return true; // Return true to keep the timeout function running
+    }, 100); // 100 milliseconds interval
 
     app->run(window);  
 }
@@ -107,13 +122,13 @@ int main() {
         if (comma == ',') { // Check if the comma was successfully extracted
             // Values were successfully parsed
             std::cout << "Parsed values: x = " << x << ", y = " << y << std::endl;
-        } 
-
-        {
-            std::lock_guard<std::mutex> lock(mtx);
-            coordinateQueue.push({ x, y});
-        }
-        cv.notify_one(); // Notify the plotting thread that new data is available
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                coordinateQueue.push({ x, y});
+                std::cout << "Coordinates added" << std::endl;
+            }
+            cv.notify_one(); // Notify the plotting thread that new data is available
+        }         
     }    
 
     // Close socket
