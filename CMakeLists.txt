@@ -25,7 +25,7 @@ add_executable(test test.cpp)
 #target_link_libraries(receiver ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(plotData ${GTKMM_LIBRARIES})
 target_link_libraries(test ${GTKMM_LIBRARIES})
-
+target_link_libraries(receiver ${GTKMM_LIBRARIES})
 # copy python script and json sample to build folder
 #install(FILES sender.py DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/build)
 #install(FILES sample.json DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/build)
